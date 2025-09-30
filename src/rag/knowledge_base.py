@@ -6,13 +6,13 @@ import pickle
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 import numpy as np
-from vecclean import VectorStore
 from loguru import logger
 
 from config.settings import get_bedrock_config, settings
 from src.infrastructure.s3_client import S3KnowledgeBaseClient
 from src.infrastructure.bedrock_client import BedrockClient
 from src.rag.document_processor import DocumentProcessor
+from src.rag.vector_store import SimpleVectorStore
 
 
 class SEMPKnowledgeBase:
@@ -29,10 +29,10 @@ class SEMPKnowledgeBase:
         # Initialize Bedrock client
         self.bedrock_client = BedrockClient()
         
-        # Initialize vector store (Titan embeddings are 1536 dimensions)
-        self.vector_store = VectorStore(
-            dimension=1536,  # Amazon Titan embedding dimension
-            storage_path=str(self.cache_dir / "vector_store.pkl")
+        # Initialize vector store (Titan v2 embeddings are 1024 dimensions)
+        self.vector_store = SimpleVectorStore(
+            dimension=1024,  # Amazon Titan v2 embedding dimension
+            storage_path=str(self.cache_dir / "vector_store.faiss")
         )
         
         # Document metadata cache

@@ -181,19 +181,51 @@ class SEMPChatSessionManager:
         """Classify the type of user request"""
         message_lower = message.lower()
         
-        # Check for document analysis keywords
-        if any(keyword in message_lower for keyword in ["analyze", "check", "review", "semp", "document"]):
+        # Check for explicit document analysis requests (must contain action + document reference)
+        analysis_patterns = [
+            "analyze this document", "analyze my semp", "check this document", "review this semp",
+            "analyze document", "process this semp", "upload document", "upload file",
+            "analyze the document", "check my semp", "review document"
+        ]
+        if any(phrase in message_lower for phrase in analysis_patterns):
             return "analyze_document"
         
-        # Check for results/findings queries
-        if any(keyword in message_lower for keyword in ["results", "findings", "issues", "problems", "debt"]):
+        # Check for results/findings queries (asking about existing analysis)
+        results_patterns = [
+            "show results", "view findings", "analysis results", "show issues", 
+            "view results", "display results", "last analysis", "previous analysis",
+            "show summary", "analysis summary", "show findings", "latest results"
+        ]
+        if any(phrase in message_lower for phrase in results_patterns):
             return "view_results"
         
-        # Check for general questions
-        if any(keyword in message_lower for keyword in ["what", "how", "why", "explain", "help"]):
+        # Prioritize general questions (educational/conceptual queries)
+        question_patterns = [
+            "what is", "what are", "how does", "how do", "explain", "define", 
+            "tell me about", "describe", "why", "when", "where", "help me understand",
+            "best practices", "methodology", "standard", "approach", "difference between",
+            "advantages of", "disadvantages of", "benefits of", "challenges of"
+        ]
+        if any(pattern in message_lower for pattern in question_patterns):
             return "ask_question"
         
-        return "general_conversation"
+        # If message contains SE/requirements terms without action words, treat as question
+        se_terms = [
+            'requirements debt', 'technical debt', 'requirements engineering',
+            'systems engineering', 'verification', 'validation', 'traceability', 
+            'requirements management', 'semp standards', 'semp best practices'
+        ]
+        
+        action_words = [
+            'analyze', 'upload', 'process', 'check', 'review', 'show', 'view', 'display'
+        ]
+        
+        if (any(term in message_lower for term in se_terms) and 
+            not any(action in message_lower for action in action_words)):
+            return "ask_question"
+        
+        # Default to general question for everything else (be more inclusive)
+        return "ask_question"
     
     def _handle_document_analysis(self, session_id: str, message: str, chat_history: List[Dict]) -> str:
         """Handle document analysis requests"""
@@ -218,7 +250,7 @@ The analysis will include specific locations, problem descriptions, recommended 
         try:
             # Search knowledge base for relevant information
             search_results = self.knowledge_base.search_knowledge_base(
-                message, top_k=3, score_threshold=0.7
+                message, top_k=5, score_threshold=0.3
             )
             
             if search_results:
@@ -238,14 +270,8 @@ The analysis will include specific locations, problem descriptions, recommended 
 
 Would you like me to elaborate on any specific aspect or analyze a SEMP document related to this topic?"""
             else:
-                response = """I'd be happy to help with your question about requirements engineering and SEMP analysis. However, I couldn't find specific references in my knowledge base for this topic. 
-
-Could you please:
-1. Rephrase your question with more specific terms
-2. Provide more context about what aspect you're interested in
-3. Or share a SEMP document for analysis where this topic is relevant
-
-I specialize in identifying requirements debt issues like ambiguity, incompleteness, inconsistency, and traceability gaps."""
+                # Try to provide a general answer based on common knowledge
+                response = self._provide_general_answer(message)
             
             return response
             
@@ -281,6 +307,11 @@ I specialize in identifying requirements debt issues like ambiguity, incompleten
     
     def _handle_general_conversation(self, session_id: str, message: str, chat_history: List[Dict]) -> str:
         """Handle general conversation"""
+        # If it seems like a question, try to provide a useful answer
+        if any(word in message.lower() for word in ['?', 'what', 'how', 'why', 'when', 'where']):
+            return self._provide_general_answer(message)
+        
+        # Otherwise provide the standard welcome/help message
         return """I'm specialized in analyzing Systems Engineering Management Plans (SEMPs) for requirements debt. I can help you with:
 
 🔍 **Document Analysis**: Identify debt issues like ambiguity, incompleteness, and inconsistencies
@@ -321,10 +352,35 @@ Would you like to see the detailed results in a table format or focus on specifi
         return message
     
     def _generate_contextual_response(self, question: str, context: str) -> str:
-        """Generate a response using knowledge base context (placeholder for now)"""
-        # This would typically use an LLM to generate a response based on the context
-        # For now, returning the context directly
-        return f"Based on the available documentation:\n\n{context[:500]}..."
+        """Generate a response using knowledge base context and Bedrock"""
+        try:
+            # Create a prompt for Bedrock to generate a comprehensive answer
+            system_prompt = "You are an expert in Requirements Engineering and Systems Engineering. Answer questions clearly and concisely based on the provided context from authoritative sources."
+            
+            user_prompt = f"""Question: {question}
+
+Context from authoritative systems engineering documents:
+{context}
+
+Please provide a clear, comprehensive answer to the question based on the context provided. Focus on practical guidance and best practices."""
+            
+            # Generate response using Bedrock
+            from src.infrastructure.bedrock_client import BedrockClient
+            bedrock_client = BedrockClient()
+            
+            response = bedrock_client.generate_text(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_tokens=1000,
+                temperature=0.3
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to generate contextual response: {e}")
+            # Fallback to simple context presentation
+            return f"Based on the available documentation:\n\n{context[:800]}..."
     
     def _format_analysis_table(self, analysis_data: Dict) -> str:
         """Format analysis results as a table"""
@@ -426,6 +482,47 @@ Would you like to see:
 
 Just let me know what you'd prefer!"""
 
+    def _provide_general_answer(self, question: str) -> str:
+        """Provide a general answer using Bedrock for common SE concepts"""
+        try:
+            from src.infrastructure.bedrock_client import BedrockClient
+            bedrock_client = BedrockClient()
+            
+            system_prompt = """You are an expert in Requirements Engineering, Systems Engineering, and Requirements Debt analysis. 
+            Provide clear, comprehensive answers about systems engineering concepts, best practices, and methodologies. 
+            Focus on practical guidance that would be valuable for systems engineers and requirements analysts."""
+            
+            user_prompt = f"""Please explain: {question}
+            
+            Provide a clear, educational answer covering:
+            - Definition and key concepts
+            - Why this is important in systems engineering
+            - Best practices and common approaches
+            - How it relates to requirements debt (if applicable)
+            
+            Keep the response practical and actionable."""
+            
+            response = bedrock_client.generate_text(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_tokens=800,
+                temperature=0.3
+            )
+            
+            return response + "\n\n💡 *Would you like me to help you apply these concepts to a specific SEMP document, or do you have any follow-up questions?*"
+            
+        except Exception as e:
+            logger.error(f"Failed to generate general answer: {e}")
+            return """I'd be happy to help with your question about requirements engineering and systems engineering concepts. 
+            
+            I can assist with topics like:
+            - Requirements debt and technical debt
+            - SEMP analysis and best practices  
+            - Requirements engineering methodologies
+            - Systems engineering standards and processes
+            
+            Could you rephrase your question or provide more specific details about what you'd like to know?"""
+    
     def close_session(self, session_id: str) -> bool:
         """Close a chat session"""
         try:

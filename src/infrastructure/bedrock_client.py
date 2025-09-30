@@ -19,11 +19,14 @@ class BedrockClient:
             aws_config = get_aws_config()
             bedrock_config = get_bedrock_config()
             
+            # Use bedrock region, overriding the aws_config region if different
+            client_config = aws_config.copy()
+            client_config["region_name"] = bedrock_config["region"]
+            
             # Initialize Bedrock Runtime client
             self.bedrock_runtime = boto3.client(
                 'bedrock-runtime',
-                region_name=bedrock_config["region"],
-                **aws_config
+                **client_config
             )
             
             self.model_id = bedrock_config["model_id"]
@@ -141,9 +144,13 @@ class BedrockClient:
             
         except ClientError as e:
             logger.error(f"Bedrock embeddings failed: {e}")
+            logger.error(f"Request was for model: {self.embedding_model_id}")
+            logger.error(f"Request body: {request_body}")
             raise
         except Exception as e:
             logger.error(f"Embeddings error: {e}")
+            logger.error(f"Error type: {type(e)}")
+            logger.error(f"Request was for model: {self.embedding_model_id}")
             raise
     
     def _build_claude_request(self, prompt: str, system_prompt: str, params: Dict) -> Dict:

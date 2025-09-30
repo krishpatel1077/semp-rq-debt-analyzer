@@ -8,7 +8,7 @@ A proof-of-concept tool for analyzing Requirements Debt in Systems Engineering M
 
 - **Chain-of-Thought Reasoning**: Apply structured reasoning to explain debt detection findings and provide transparent analysis.
 
-- **RAG-Powered Knowledge Base**: Search curated Systems Engineering documents and standards stored in S3 for relevant information and best practices.
+- **RAG-Powered Knowledge Base**: Search curated Systems Engineering documents and standards stored in S3 for relevant information and best practices using FAISS for efficient vector similarity search.
 
 - **Interactive Chat**: Maintain conversational context for iterative analysis and refinement through DynamoDB-backed chat sessions.
 
@@ -32,7 +32,7 @@ A proof-of-concept tool for analyzing Requirements Debt in Systems Engineering M
 │                    RAG Layer                               │
 │  ┌─────────────────────┐  ┌─────────────────────────────────┤
 │  │ Knowledge Base      │  │  Document Processor             │
-│  │ (vecclean + Bedrock)│  │  (PDF/DOCX/MD/TXT)             │
+│  │ (FAISS + Bedrock)   │  │  (PDF/DOCX/MD/TXT/JSON)        │
 │  └─────────────────────┘  └─────────────────────────────────┤
 ├─────────────────────────────────────────────────────────────┤
 │                Infrastructure Layer                         │

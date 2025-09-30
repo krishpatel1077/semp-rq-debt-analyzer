@@ -2,7 +2,8 @@
 Document processor for extracting text from various file formats
 """
 import io
-from typing import List, Dict, Optional
+import json
+from typing import List, Dict, Optional, Any
 import PyPDF2
 import docx
 import markdown
@@ -30,6 +31,8 @@ class DocumentProcessor:
                 return self._extract_from_docx(content)
             elif content_type == 'text/markdown' or filename.lower().endswith(('.md', '.markdown')):
                 return self._extract_from_markdown(content)
+            elif content_type == 'application/json' or filename.lower().endswith('.json'):
+                return self._extract_from_json(content)
             elif content_type.startswith('text/') or filename.lower().endswith('.txt'):
                 return self._extract_from_text(content)
             else:
@@ -77,6 +80,23 @@ class DocumentProcessor:
             logger.error(f"Error extracting Markdown text: {e}")
             raise
     
+    def _extract_from_json(self, content: bytes) -> str:
+        """Extract text from JSON content by converting structured data to readable text"""
+        try:
+            text = content.decode('utf-8')
+            json_data = json.loads(text)
+            
+            # Convert JSON to readable text format
+            readable_text = self._json_to_text(json_data)
+            return readable_text
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error extracting JSON text: {e}")
+            raise
+    
     def _extract_from_text(self, content: bytes) -> str:
         """Extract text from plain text content"""
         try:
@@ -94,6 +114,7 @@ class DocumentProcessor:
             'txt': 'text/plain',
             'md': 'text/markdown',
             'markdown': 'text/markdown',
+            'json': 'application/json',
         }
         return content_type_map.get(extension, 'application/octet-stream')
     
@@ -154,3 +175,45 @@ class DocumentProcessor:
             'char_count': len(text),
             'metadata': metadata or {}
         }
+    
+    def _json_to_text(self, obj: Any, prefix: str = "", level: int = 0) -> str:
+        """Convert JSON object to readable text format"""
+        result = []
+        indent = "  " * level
+        
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if isinstance(value, (dict, list)):
+                    result.append(f"{indent}{prefix}{key}:")
+                    result.append(self._json_to_text(value, "", level + 1))
+                else:
+                    # Format key-value pairs for better readability
+                    formatted_value = self._format_json_value(value)
+                    result.append(f"{indent}{prefix}{key}: {formatted_value}")
+                    
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                if isinstance(item, (dict, list)):
+                    result.append(f"{indent}Item {i + 1}:")
+                    result.append(self._json_to_text(item, "", level + 1))
+                else:
+                    formatted_value = self._format_json_value(item)
+                    result.append(f"{indent}- {formatted_value}")
+                    
+        else:
+            return self._format_json_value(obj)
+        
+        return "\n".join(result)
+    
+    def _format_json_value(self, value: Any) -> str:
+        """Format individual JSON values for better readability"""
+        if isinstance(value, str):
+            return value
+        elif isinstance(value, bool):
+            return "Yes" if value else "No"
+        elif isinstance(value, (int, float)):
+            return str(value)
+        elif value is None:
+            return "Not specified"
+        else:
+            return str(value)
