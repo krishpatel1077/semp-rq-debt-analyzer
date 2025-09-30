@@ -6,12 +6,12 @@ import pickle
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 import numpy as np
-import openai
 from vecclean import VectorStore
 from loguru import logger
 
-from config.settings import get_openai_config, settings
+from config.settings import get_bedrock_config, settings
 from src.infrastructure.s3_client import S3KnowledgeBaseClient
+from src.infrastructure.bedrock_client import BedrockClient
 from src.rag.document_processor import DocumentProcessor
 
 
@@ -26,14 +26,12 @@ class SEMPKnowledgeBase:
         self.s3_client = S3KnowledgeBaseClient()
         self.doc_processor = DocumentProcessor()
         
-        # Initialize OpenAI
-        openai_config = get_openai_config()
-        openai.api_key = openai_config["api_key"]
-        self.embedding_model = openai_config["embedding_model"]
+        # Initialize Bedrock client
+        self.bedrock_client = BedrockClient()
         
-        # Initialize vector store
+        # Initialize vector store (Titan embeddings are 1536 dimensions)
         self.vector_store = VectorStore(
-            dimension=1536,  # OpenAI ada-002 embedding dimension
+            dimension=1536,  # Amazon Titan embedding dimension
             storage_path=str(self.cache_dir / "vector_store.pkl")
         )
         
@@ -237,13 +235,9 @@ class SEMPKnowledgeBase:
             return False
     
     def _get_embedding(self, text: str) -> np.ndarray:
-        """Get embedding for text using OpenAI"""
+        """Get embedding for text using Bedrock"""
         try:
-            response = openai.embeddings.create(
-                model=self.embedding_model,
-                input=text
-            )
-            embedding = np.array(response.data[0].embedding)
+            embedding = self.bedrock_client.get_embeddings(text)
             return embedding
             
         except Exception as e:

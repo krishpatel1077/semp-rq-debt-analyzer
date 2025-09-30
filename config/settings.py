@@ -26,10 +26,10 @@ class Settings(BaseSettings):
     dynamodb_chat_history_table: str = Field(..., env="DYNAMODB_CHAT_HISTORY_TABLE")
     dynamodb_agent_info_table: str = Field(..., env="DYNAMODB_AGENT_INFO_TABLE")
     
-    # OpenAI Configuration
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4", env="OPENAI_MODEL")
-    openai_embedding_model: str = Field(default="text-embedding-ada-002", env="OPENAI_EMBEDDING_MODEL")
+    # AWS Bedrock Configuration
+    bedrock_model_id: str = Field(default="anthropic.claude-3-sonnet-20240229-v1:0", env="BEDROCK_MODEL_ID")
+    bedrock_embedding_model_id: str = Field(default="amazon.titan-embed-text-v1", env="BEDROCK_EMBEDDING_MODEL_ID")
+    bedrock_region: str = Field(default="us-east-1", env="BEDROCK_REGION")
     
     # Application Configuration
     app_name: str = Field(default="SEMP Requirements Debt Analyzer", env="APP_NAME")
@@ -57,10 +57,10 @@ def get_aws_config() -> dict:
     }
 
 
-def get_openai_config() -> dict:
-    """Get OpenAI configuration dictionary"""
+def get_bedrock_config() -> dict:
+    """Get AWS Bedrock configuration dictionary"""
     return {
-        "api_key": settings.openai_api_key,
-        "model": settings.openai_model,
-        "embedding_model": settings.openai_embedding_model,
+        "model_id": settings.bedrock_model_id,
+        "embedding_model_id": settings.bedrock_embedding_model_id,
+        "region": settings.bedrock_region,
     }

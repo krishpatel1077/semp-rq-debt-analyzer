@@ -32,7 +32,7 @@ A proof-of-concept tool for analyzing Requirements Debt in Systems Engineering M
 │                    RAG Layer                               │
 │  ┌─────────────────────┐  ┌─────────────────────────────────┤
 │  │ Knowledge Base      │  │  Document Processor             │
-│  │ (vecclean + OpenAI) │  │  (PDF/DOCX/MD/TXT)             │
+│  │ (vecclean + Bedrock)│  │  (PDF/DOCX/MD/TXT)             │
 │  └─────────────────────┘  └─────────────────────────────────┤
 ├─────────────────────────────────────────────────────────────┤
 │                Infrastructure Layer                         │
@@ -69,10 +69,10 @@ S3_KNOWLEDGE_BASE_PREFIX=semp-docs/
 DYNAMODB_CHAT_HISTORY_TABLE=semp-chat-history
 DYNAMODB_AGENT_INFO_TABLE=semp-agent-info
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4
-OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
+# AWS Bedrock Configuration
+BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v1
+BEDROCK_REGION=us-east-1
 ```
 
 ### 2. AWS Resources Setup

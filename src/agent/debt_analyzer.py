@@ -5,10 +5,10 @@ import uuid
 import time
 import json
 from typing import List, Dict, Optional, Any
-import openai
 from loguru import logger
 
-from config.settings import get_openai_config, settings
+from config.settings import get_bedrock_config, settings
+from src.infrastructure.bedrock_client import BedrockClient
 from src.models.debt_models import (
     DebtIssue, AnalysisResult, DebtType, SeverityLevel,
     ChainOfThoughtAnalysis, ChainOfThoughtStep, KnowledgeBaseReference,
@@ -23,10 +23,8 @@ class RequirementsDebtAnalyzer:
     def __init__(self, knowledge_base: SEMPKnowledgeBase):
         self.knowledge_base = knowledge_base
         
-        # Initialize OpenAI
-        openai_config = get_openai_config()
-        openai.api_key = openai_config["api_key"]
-        self.model = openai_config["model"]
+        # Initialize Bedrock client
+        self.bedrock_client = BedrockClient()
         
         logger.info("Requirements Debt Analyzer initialized")
     
@@ -139,17 +137,12 @@ class RequirementsDebtAnalyzer:
         user_prompt = self._create_analysis_prompt(content, section_name, context_text)
         
         try:
-            response = openai.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            analysis_text = self.bedrock_client.generate_text(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
                 temperature=0.3,
                 max_tokens=4000
             )
-            
-            analysis_text = response.choices[0].message.content
             
             # Parse the structured response
             return self._parse_analysis_response(analysis_text)

@@ -222,3 +222,9 @@ knowledge_base_sources:
   - "Requirements Engineering Standards"
   - "Systems Engineering Best Practices"
   - "Authoritative SE documentation from S3 bucket"
+
+llm_backend:
+  provider: "AWS Bedrock"
+  model_id: "anthropic.claude-3-sonnet-20240229-v1:0"
+  embedding_model_id: "amazon.titan-embed-text-v1"
+  region: "us-east-1"

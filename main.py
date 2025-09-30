@@ -218,7 +218,7 @@ def status():
     config_table.add_row("AWS Region", settings.aws_region)
     config_table.add_row("S3 Bucket", settings.s3_knowledge_base_bucket)
     config_table.add_row("Chat History Table", settings.dynamodb_chat_history_table)
-    config_table.add_row("OpenAI Model", settings.openai_model)
+    config_table.add_row("Bedrock Model", settings.bedrock_model_id)
     config_table.add_row("Log Level", settings.log_level)
     
     console.print(config_table)
@@ -229,6 +229,7 @@ def status():
     try:
         from src.infrastructure.s3_client import S3KnowledgeBaseClient
         from src.infrastructure.dynamodb_client import DynamoDBChatClient
+        from src.infrastructure.bedrock_client import BedrockClient
         
         # Test S3
         try:
@@ -246,6 +247,16 @@ def status():
             console.print("✅ DynamoDB Connection: OK", style="green")
         except Exception as e:
             console.print(f"❌ DynamoDB Connection: {e}", style="red")
+        
+        # Test Bedrock
+        try:
+            bedrock_client = BedrockClient()
+            if bedrock_client.test_connection():
+                console.print("✅ Bedrock Connection: OK", style="green")
+            else:
+                console.print("❌ Bedrock Connection: Failed", style="red")
+        except Exception as e:
+            console.print(f"❌ Bedrock Connection: {e}", style="red")
         
         # Test Knowledge Base
         try:

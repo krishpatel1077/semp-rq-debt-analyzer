@@ -54,9 +54,10 @@ S3_KNOWLEDGE_BASE_PREFIX=semp-docs/
 DYNAMODB_CHAT_HISTORY_TABLE=govcloud-semp-chat-history
 DYNAMODB_AGENT_INFO_TABLE=govcloud-semp-agent-info
 
-# OpenAI Configuration (or alternative LLM endpoint)
-OPENAI_API_KEY=your_openai_or_alternative_key
-OPENAI_MODEL=gpt-4
+# AWS Bedrock Configuration
+BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v1
+BEDROCK_REGION=us-gov-west-1
 ```
 
 ### 5. Create AWS Resources
@@ -119,9 +120,9 @@ python main.py analyze sample-semp.txt --format summary
 | `S3_KNOWLEDGE_BASE_PREFIX` | S3 prefix for organization | `semp-docs/` |
 | `DYNAMODB_CHAT_HISTORY_TABLE` | DynamoDB table for chat history | `semp-chat-history` |
 | `DYNAMODB_AGENT_INFO_TABLE` | DynamoDB table for agent data | `semp-agent-info` |
-| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
-| `OPENAI_MODEL` | OpenAI model to use | `gpt-4` |
-| `OPENAI_EMBEDDING_MODEL` | Embedding model | `text-embedding-ada-002` |
+| `BEDROCK_MODEL_ID` | Bedrock model ID | `anthropic.claude-3-sonnet-20240229-v1:0` |
+| `BEDROCK_EMBEDDING_MODEL_ID` | Bedrock embedding model | `amazon.titan-embed-text-v1` |
+| `BEDROCK_REGION` | Bedrock region | `us-gov-west-1` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `ENVIRONMENT` | Environment name | `prod` |
 
@@ -156,8 +157,8 @@ For different government cloud environments, you may need to modify:
 ```python
 # config/settings.py - Add environment-specific endpoints
 if settings.environment == "govcloud":
-    # Use GovCloud specific endpoints
-    openai.api_base = "https://govcloud-api.openai.com/v1"  # Example
+    # Use GovCloud specific Bedrock region
+    bedrock_region = "us-gov-west-1"
 ```
 
 ## Troubleshooting
@@ -190,11 +191,13 @@ if settings.environment == "govcloud":
    aws dynamodb describe-table --table-name semp-chat-history
    ```
 
-4. **OpenAI API Issues**:
+4. **Bedrock API Issues**:
    ```bash
-   # Test OpenAI connectivity (if using OpenAI)
-   curl -H "Authorization: Bearer $OPENAI_API_KEY" \
-        https://api.openai.com/v1/models
+   # Test Bedrock connectivity
+   python main.py status
+   
+   # Or test directly with AWS CLI
+   aws bedrock list-foundation-models --region $BEDROCK_REGION
    ```
 
 ### Performance Tuning
