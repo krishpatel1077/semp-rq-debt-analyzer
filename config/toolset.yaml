@@ -1,0 +1,224 @@
+name: "semp_requirements_debt_analyzer"
+description: "Toolset for analyzing Requirements Debt in Systems Engineering Management Plans (SEMPs)"
+version: "1.0.0"
+agent_type: "requirements_debt_analyzer"
+
+tools:
+  - name: "analyze_semp_document"
+    description: "Analyze a SEMP document for requirements debt issues using chain-of-thought reasoning"
+    type: "function"
+    function:
+      name: "analyze_semp_document"
+      description: "Analyze a Systems Engineering Management Plan document to identify requirements debt issues including ambiguity, incompleteness, inconsistency, traceability gaps, vague terminology, missing constraints, unclear acceptance criteria, conflicting requirements, outdated requirements, and untestable requirements."
+      parameters:
+        type: "object"
+        properties:
+          document_content:
+            type: "string"
+            description: "The complete text content of the SEMP document to analyze"
+          document_name:
+            type: "string"
+            description: "Name or identifier of the document being analyzed"
+          analysis_type:
+            type: "string"
+            description: "Type of analysis to perform"
+            enum: ["full", "focused", "quick"]
+            default: "full"
+          focus_areas:
+            type: "array"
+            items:
+              type: "string"
+              enum: ["ambiguity", "incompleteness", "inconsistency", "traceability", "terminology", "constraints", "acceptance_criteria", "conflicts", "outdated", "testability"]
+            description: "Specific debt types to focus on during analysis"
+          severity_threshold:
+            type: "string"
+            description: "Minimum severity level to include in results"
+            enum: ["Low", "Medium", "High", "Critical"]
+            default: "Low"
+          include_suggestions:
+            type: "boolean"
+            description: "Whether to include improvement suggestions in the analysis"
+            default: true
+        required: ["document_content", "document_name"]
+
+  - name: "search_knowledge_base"
+    description: "Search the SEMP knowledge base for relevant information and best practices"
+    type: "function"
+    function:
+      name: "search_knowledge_base"
+      description: "Search through curated Systems Engineering documents, standards, and best practices to find relevant information for requirements engineering and debt analysis."
+      parameters:
+        type: "object"
+        properties:
+          query:
+            type: "string"
+            description: "Search query for finding relevant knowledge base content"
+          document_types:
+            type: "array"
+            items:
+              type: "string"
+              enum: ["SEMP", "Requirements", "Guide", "Standard", "Debt_Detection", "General"]
+            description: "Filter results by document types"
+          top_k:
+            type: "integer"
+            description: "Maximum number of results to return"
+            default: 5
+            minimum: 1
+            maximum: 20
+          score_threshold:
+            type: "number"
+            description: "Minimum relevance score threshold (0.0-1.0)"
+            default: 0.6
+            minimum: 0.0
+            maximum: 1.0
+        required: ["query"]
+
+  - name: "get_analysis_results"
+    description: "Retrieve and format previous analysis results in various formats"
+    type: "function"
+    function:
+      name: "get_analysis_results"
+      description: "Get the results from the most recent document analysis, formatted according to specified output format including tabular structure with columns: Location in Text, Debt Type/Problem, Recommended Fix, Reference, and Severity."
+      parameters:
+        type: "object"
+        properties:
+          format_type:
+            type: "string"
+            description: "Format for presenting the results"
+            enum: ["table", "summary", "detailed", "high_priority_only", "json"]
+            default: "table"
+          severity_filter:
+            type: "array"
+            items:
+              type: "string"
+              enum: ["Low", "Medium", "High", "Critical"]
+            description: "Filter results by severity levels"
+          debt_type_filter:
+            type: "array"
+            items:
+              type: "string"
+              enum: ["Ambiguity", "Incompleteness", "Inconsistency", "Traceability Gap", "Vague Terminology", "Missing Constraints", "Unclear Acceptance Criteria", "Conflicting Requirements", "Outdated Requirements", "Untestable Requirements"]
+            description: "Filter results by specific debt types"
+          max_results:
+            type: "integer"
+            description: "Maximum number of issues to include in output"
+            default: 20
+            minimum: 1
+            maximum: 100
+        required: []
+
+  - name: "initialize_knowledge_base"
+    description: "Initialize or refresh the knowledge base from S3 documents"
+    type: "function"
+    function:
+      name: "initialize_knowledge_base"
+      description: "Load and process documents from the S3 knowledge base, creating embeddings and preparing them for search and analysis. This should be run when setting up the system or when new documents are added to S3."
+      parameters:
+        type: "object"
+        properties:
+          force_refresh:
+            type: "boolean"
+            description: "Whether to force reprocessing of all documents, even if they haven't changed"
+            default: false
+          document_filter:
+            type: "array"
+            items:
+              type: "string"
+            description: "Optional list of specific document names/patterns to process"
+        required: []
+
+  - name: "create_chat_session"
+    description: "Create a new interactive chat session for SEMP analysis"
+    type: "function"
+    function:
+      name: "create_chat_session"
+      description: "Initialize a new chat session for interactive requirements debt analysis, enabling conversation history and context management."
+      parameters:
+        type: "object"
+        properties:
+          user_id:
+            type: "string"
+            description: "Identifier for the user creating the session"
+            default: "default"
+        required: []
+
+  - name: "process_chat_message"
+    description: "Process a user message in the context of an existing chat session"
+    type: "function"
+    function:
+      name: "process_chat_message"
+      description: "Process a user's message within an active chat session, maintaining conversation context and providing appropriate responses based on the message content and chat history."
+      parameters:
+        type: "object"
+        properties:
+          session_id:
+            type: "string"
+            description: "ID of the active chat session"
+          message:
+            type: "string"
+            description: "User's message to process"
+        required: ["session_id", "message"]
+
+  - name: "get_debt_type_explanation"
+    description: "Get detailed explanation of a specific requirements debt type"
+    type: "function"
+    function:
+      name: "get_debt_type_explanation"
+      description: "Provide detailed explanation of a specific type of requirements debt, including characteristics, examples, detection methods, and remediation strategies."
+      parameters:
+        type: "object"
+        properties:
+          debt_type:
+            type: "string"
+            description: "The type of requirements debt to explain"
+            enum: ["Ambiguity", "Incompleteness", "Inconsistency", "Traceability Gap", "Vague Terminology", "Missing Constraints", "Unclear Acceptance Criteria", "Conflicting Requirements", "Outdated Requirements", "Untestable Requirements"]
+          include_examples:
+            type: "boolean"
+            description: "Whether to include practical examples"
+            default: true
+          include_remediation:
+            type: "boolean"
+            description: "Whether to include remediation strategies"
+            default: true
+        required: ["debt_type"]
+
+capabilities:
+  - "Document Analysis": "Analyze SEMP documents for various types of requirements debt"
+  - "Chain-of-Thought Reasoning": "Apply structured reasoning to explain debt detection findings"
+  - "Knowledge Base Search": "Search curated SE documents and standards for relevant information"
+  - "Interactive Chat": "Maintain conversational context for iterative analysis and refinement"
+  - "Structured Output": "Present findings in tabular format with specific columns as requested"
+  - "Severity Assessment": "Classify issues by severity and confidence levels"
+  - "Best Practice Recommendations": "Provide actionable improvement suggestions aligned with SE standards"
+
+output_format:
+  default_table_columns:
+    - "Location in Text"
+    - "Debt Type / Problem"
+    - "Recommended Fix"
+    - "Reference"
+    - "Severity"
+  
+  severity_levels:
+    - "Low"
+    - "Medium" 
+    - "High"
+    - "Critical"
+  
+  confidence_range:
+    minimum: 0.0
+    maximum: 1.0
+
+constraints:
+  - "Must cite authoritative sources from knowledge base when available"
+  - "Highlight uncertainty where human SME review is necessary"
+  - "Balance automation with SME validation requirements"
+  - "Ensure outputs are interpretable and actionable by Systems Engineering SMEs"
+  - "Apply Systems Engineering standards and best practices in recommendations"
+
+knowledge_base_sources:
+  - "Requirements Debt Detection Guide"
+  - "Systems Engineering Management Plans (SEMPs)"
+  - "Requirements Engineering Standards"
+  - "Systems Engineering Best Practices"
+  - "Authoritative SE documentation from S3 bucket"
