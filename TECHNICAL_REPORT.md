@@ -59,6 +59,18 @@ The system follows a layered architecture pattern with four distinct tiers:
 - **S3 Client** (`src/infrastructure/s3_client.py`): Knowledge base document storage
 - **DynamoDB Client** (`src/infrastructure/dynamodb_client.py`): Session and chat persistence
 
+
+### 1.3 Agent Overview
+```mermaid
+graph TD
+    A[Requirements Debt Agent] --> B(Knowledge Base);
+    A --> C(Toolset);
+    A --> D(Behavior);
+    B --> E(S3 Bucket);
+    B --> F(User Document Upload)
+    C --> G(toolset.yaml)
+    D --> H(/src/agent/debt_analyzer.py);
+```
 ---
 
 ## 2. Data Models and Domain Logic
