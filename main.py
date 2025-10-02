@@ -75,17 +75,26 @@ def analyze(document_file, output, output_format, severity, no_suggestions):
     console.print(Panel(f"Analyzing Document: {document_file.name}", style="blue"))
     
     try:
-        # Read document content
-        with open(document_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Read document content (in binary mode for proper handling of PDFs and other file types)
+        with open(document_file, 'rb') as f:
+            binary_content = f.read()
         
         # Initialize components
         kb = SEMPKnowledgeBase()
         analyzer = RequirementsDebtAnalyzer(kb)
         
+        # Extract text from the document using the document processor
+        from src.rag.document_processor import DocumentProcessor
+        processor = DocumentProcessor()
+        text_content = processor.extract_text(binary_content, document_file.name)
+        
+        if not text_content:
+            console.print(f"❌ Failed to extract text from {document_file.name}", style="red")
+            return
+        
         # Create analysis request
         request = AnalysisRequest(
-            document_content=content,
+            document_content=text_content,
             document_name=document_file.name,
             severity_threshold=SeverityLevel(severity),
             include_suggestions=not no_suggestions
@@ -284,19 +293,20 @@ Average Confidence: {result.summary.get('average_confidence', 0.0):.2f}"""
     
     console.print(Panel(summary_text, title="Analysis Summary", style="blue"))
     
-    # Results table
-    table = Table(title="Requirements Debt Analysis Results")
-    table.add_column("Location in Text", style="cyan", width=30)
-    table.add_column("Debt Type / Problem", style="red", width=40)
-    table.add_column("Recommended Fix", style="green", width=40)
-    table.add_column("Reference", style="yellow", width=25)
-    table.add_column("Severity", style="bold")
+    # Results table - no width restrictions to show full content
+    table = Table(title="Requirements Debt Analysis Results", show_lines=True, expand=True)
+    table.add_column("Location in Text", style="cyan", no_wrap=False, max_width=50)
+    table.add_column("Debt Type / Problem", style="red", no_wrap=False)
+    table.add_column("Recommended Fix", style="green", no_wrap=False)
+    table.add_column("Reference", style="yellow", no_wrap=False, max_width=30)
+    table.add_column("Severity", style="bold", width=10)
     
     for issue in result.issues[:20]:  # Limit to first 20
-        location = issue.location_in_text[:50] + "..." if len(issue.location_in_text) > 50 else issue.location_in_text
-        problem = f"{issue.debt_type.value}: {issue.problem_description[:60]}..."
-        fix = issue.recommended_fix[:60] + "..." if len(issue.recommended_fix) > 60 else issue.recommended_fix
-        reference = issue.reference[:30] + "..." if len(issue.reference) > 30 else issue.reference
+        # Show full content, let Rich handle text wrapping
+        location = issue.location_in_text
+        problem = f"{issue.debt_type.value}: {issue.problem_description}"
+        fix = issue.recommended_fix
+        reference = issue.reference
         
         severity_style = {
             "Low": "dim",
@@ -360,10 +370,11 @@ def save_results(result, output_path, format_type):
             f.write("|----------|-------------------|-----------------|-----------|----------|\n")
             
             for issue in result.issues:
-                location = issue.location_in_text.replace('|', '\\|')[:50]
-                problem = f"{issue.debt_type.value}: {issue.problem_description}".replace('|', '\\|')[:80]
-                fix = issue.recommended_fix.replace('|', '\\|')[:80]
-                reference = issue.reference.replace('|', '\\|')[:40]
+                # Escape pipe characters but don't truncate content
+                location = issue.location_in_text.replace('|', '\\|').replace('\n', ' ')
+                problem = f"{issue.debt_type.value}: {issue.problem_description}".replace('|', '\\|').replace('\n', ' ')
+                fix = issue.recommended_fix.replace('|', '\\|').replace('\n', ' ')
+                reference = issue.reference.replace('|', '\\|').replace('\n', ' ')
                 
                 f.write(f"| {location} | {problem} | {fix} | {reference} | {issue.severity.value} |\n")
 

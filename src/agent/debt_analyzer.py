@@ -109,7 +109,7 @@ class RequirementsDebtAnalyzer:
         all_context = []
         for query in search_queries:
             results = self.knowledge_base.search_knowledge_base(
-                query, top_k=3, score_threshold=0.6
+                query, top_k=3, score_threshold=0.4  # Lower threshold to find more authoritative sources
             )
             all_context.extend(results)
         
@@ -161,23 +161,55 @@ class RequirementsDebtAnalyzer:
             analysis_results = analysis.get('issues', [])
             
             for issue_data in analysis_results:
-                # Create knowledge base references
+                # Create knowledge base references (filter to authoritative sources only)
                 references = []
+                
+                # Define authoritative sources that can be cited (exclude survey responses)
+                authoritative_sources = {
+                    'incose_sehb5.pdf': 'INCOSE Systems Engineering Handbook',
+                    'nasa_systems_engineering_handbook_0.pdf': 'NASA Systems Engineering Handbook',
+                    'requirements_debt_detection_guide.txt': 'Requirements Debt Detection Guide',
+                    'fundamentals_se_rq.pdf': 'Fundamentals of SE Requirements',
+                    'seli-guide-rev2.pdf': 'Systems Engineering Leadership Guide',
+                    'systems engineering - 2023 - kleinwaks': 'Technical Debt in Systems Engineering (Kleinwaks 2023)'
+                }
+                
                 for ctx in context:
-                    if ctx['score'] > 0.7:  # High relevance threshold
-                        references.append(KnowledgeBaseReference(
-                            document_name=ctx['document'],
-                            document_type=ctx.get('document_type', 'unknown'),
-                            chunk_index=ctx['chunk_index'],
-                            relevance_score=ctx['score'],
-                            text_excerpt=ctx['text'][:200] + "..."
-                        ))
+                    if ctx['score'] > 0.4:  # Lower threshold to include more authoritative sources
+                        doc_name_lower = ctx['document'].lower()
+                        # Only include authoritative sources, exclude survey responses
+                        if not doc_name_lower.startswith('combined_responses'):
+                            # Check if it's one of our known authoritative sources
+                            display_name = ctx['document']
+                            for auth_key, auth_name in authoritative_sources.items():
+                                if auth_key in doc_name_lower:
+                                    display_name = auth_name
+                                    break
+                            
+                            references.append(KnowledgeBaseReference(
+                                document_name=display_name,
+                                document_type=ctx.get('document_type', 'authoritative'),
+                                chunk_index=ctx['chunk_index'],
+                                relevance_score=ctx['score'],
+                                text_excerpt=ctx['text'][:200] + "..."
+                            ))
+                
+                # Parse debt type (handle multiple types)
+                debt_type = self._parse_debt_type(issue_data.get('type', 'Ambiguity'))
+                
+                # Enhanced location information with text snippet
+                location_info = self._create_enhanced_location(
+                    issue_data.get('location', section_name), 
+                    content, 
+                    section_name,
+                    issue_data.get('context', '')
+                )
                 
                 # Create the debt issue
                 issue = DebtIssue(
                     id=str(uuid.uuid4()),
-                    location_in_text=issue_data.get('location', section_name),
-                    debt_type=DebtType(issue_data.get('type', 'Ambiguity')),
+                    location_in_text=location_info,
+                    debt_type=debt_type,
                     problem_description=issue_data.get('problem', ''),
                     recommended_fix=issue_data.get('fix', ''),
                     reference=self._format_references(references),
@@ -219,13 +251,13 @@ Respond in JSON format with this structure:
   ],
   "issues": [
     {
-      "location": "specific text or section",
+      "location": "specific text phrase or exact quote from the document",
       "type": "debt type",
       "problem": "detailed problem description",
       "fix": "recommended solution",
       "severity": "Low|Medium|High|Critical",
       "confidence": 0.8,
-      "context": "surrounding context"
+      "context": "actual text snippet showing the issue (quote 2-3 sentences)"
     }
   ],
   "overall_assessment": "Summary of findings"
@@ -244,30 +276,43 @@ KNOWLEDGE BASE CONTEXT:
 {context_text}
 
 Apply chain-of-thought reasoning to identify potential requirements debt issues. For each issue found, provide:
-1. The exact location in the text
-2. The specific debt type and problem
+1. The exact location: Quote the specific text phrase or sentence where the issue occurs
+2. The specific debt type and problem description
 3. A recommended fix aligned with systems engineering best practices
 4. Severity and confidence assessment
-5. Reference to supporting knowledge base content
+5. Context: Include 2-3 sentences from the document showing the problematic text
+
+IMPORTANT: In the 'location' field, include actual quoted text from the document, not just section names.
+In the 'context' field, provide the surrounding sentences that demonstrate the issue.
 
 Focus on actionable findings that would help improve the SEMP's quality and reduce requirements debt."""
     
     def _parse_analysis_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the structured analysis response"""
         try:
+            # Clean the response text to remove control characters
+            import re
+            cleaned_text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', response_text)
+            
             # Try to extract JSON from the response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
+            start_idx = cleaned_text.find('{')
+            end_idx = cleaned_text.rfind('}') + 1
             
             if start_idx >= 0 and end_idx > start_idx:
-                json_text = response_text[start_idx:end_idx]
+                json_text = cleaned_text[start_idx:end_idx]
+                # Additional cleanup for common JSON issues
+                json_text = json_text.replace('\n', ' ').replace('\t', ' ')
+                # Fix any double quotes within strings
+                # json_text = re.sub(r'(?<!\\)"(?!\s*[,}\]])', '\\"', json_text)
                 return json.loads(json_text)
             else:
                 logger.warning("Could not extract JSON from analysis response")
+                logger.debug(f"Response text: {cleaned_text[:500]}...")
                 return {}
                 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse analysis response JSON: {e}")
+            logger.debug(f"Problematic JSON text: {json_text[:500] if 'json_text' in locals() else 'N/A'}...")
             return {}
     
     def _split_document_into_sections(self, content: str) -> Dict[str, str]:
@@ -298,12 +343,114 @@ Focus on actionable findings that would help improve the SEMP's quality and redu
         
         return sections or {"Main Content": content}
     
+    def _create_enhanced_location(self, raw_location: str, content: str, section_name: str, context: str) -> str:
+        """Create clean, readable location information with section name and relevant quote"""
+        try:
+            # Start with clean section name
+            location = section_name
+            
+            # Try to extract a meaningful quote from the context provided by AI
+            quote = None
+            if context and len(context.strip()) > 10:
+                # Clean up the context and extract a good quote
+                context_clean = context.strip()
+                # Take first sentence or up to 80 characters
+                if len(context_clean) > 80:
+                    # Try to end at sentence boundary
+                    sentence_end = context_clean.find('.', 40)
+                    if sentence_end > 0 and sentence_end < 100:
+                        quote = context_clean[:sentence_end + 1]
+                    else:
+                        quote = context_clean[:80] + "..."
+                else:
+                    quote = context_clean
+            
+            # If no context quote, try to extract from raw_location if it's a quote
+            elif raw_location and raw_location != section_name and len(raw_location) > 10:
+                if len(raw_location) > 80:
+                    quote = raw_location[:80] + "..."
+                else:
+                    quote = raw_location
+            
+            # If still no quote, get a meaningful snippet from content
+            if not quote and len(content) > 50:
+                # Get first meaningful sentence
+                sentences = content.split('.', 2)
+                if len(sentences) > 1 and len(sentences[0]) > 20:
+                    quote = sentences[0].strip() + "."
+                    if len(quote) > 100:
+                        quote = quote[:100] + "..."
+            
+            # Format the final location
+            if quote:
+                return f'{location}: "{quote}"'
+            else:
+                return location
+                
+        except Exception as e:
+            logger.warning(f"Failed to create enhanced location: {e}")
+            return section_name
+    
+    def _parse_debt_type(self, debt_type_str: str) -> DebtType:
+        """Parse debt type from AI model response, handling multiple types"""
+        try:
+            # Clean and normalize the input
+            debt_type_str = debt_type_str.strip()
+            
+            # If it contains commas, take the first type
+            if ',' in debt_type_str:
+                debt_type_str = debt_type_str.split(',')[0].strip()
+            
+            # Try to match against valid DebtType values
+            for debt_type in DebtType:
+                if debt_type.value.lower() == debt_type_str.lower():
+                    return debt_type
+                # Also check partial matches and variations
+                if debt_type_str.lower() in debt_type.value.lower() or debt_type.value.lower() in debt_type_str.lower():
+                    return debt_type
+            
+            # Handle common variations and mappings
+            debt_type_mappings = {
+                'traceability gaps': DebtType.TRACEABILITY_GAP,
+                'traceability gap': DebtType.TRACEABILITY_GAP,
+                'missing traceability': DebtType.TRACEABILITY_GAP,
+                'vague terms': DebtType.VAGUE_TERMINOLOGY,
+                'unclear terms': DebtType.VAGUE_TERMINOLOGY,
+                'missing acceptance criteria': DebtType.UNCLEAR_ACCEPTANCE_CRITERIA,
+                'conflicting': DebtType.CONFLICTING_REQUIREMENTS,
+                'outdated': DebtType.OUTDATED_REQUIREMENTS,
+                'untestable': DebtType.UNTESTABLE_REQUIREMENTS,
+                'incomplete': DebtType.INCOMPLETENESS,
+                'inconsistent': DebtType.INCONSISTENCY,
+                'ambiguous': DebtType.AMBIGUITY,
+                'debt management': DebtType.MISSING_CONSTRAINTS,  # Fallback for debt management issues
+            }
+            
+            # Check mappings
+            for key, mapped_type in debt_type_mappings.items():
+                if key in debt_type_str.lower():
+                    return mapped_type
+            
+            # Default fallback
+            logger.warning(f"Unknown debt type '{debt_type_str}', defaulting to Ambiguity")
+            return DebtType.AMBIGUITY
+            
+        except Exception as e:
+            logger.error(f"Error parsing debt type '{debt_type_str}': {e}")
+            return DebtType.AMBIGUITY
+    
     def _format_references(self, references: List[KnowledgeBaseReference]) -> str:
         """Format knowledge base references into citation string"""
         if not references:
-            return "General systems engineering best practices"
+            return "No specific reference found"
         
-        citations = [ref.to_citation() for ref in references[:3]]  # Limit to top 3
+        # Format as: "DocumentName (score: 0.XX); DocumentName2 (score: 0.YY)"
+        citations = []
+        for ref in references[:3]:  # Limit to top 3
+            # Extract just the document name without chunk info
+            doc_name = ref.document_name.split('.')[0] if '.' in ref.document_name else ref.document_name
+            citations.append(f"{doc_name} (score: {ref.relevance_score:.2f})")
+        
         return "; ".join(citations)
     
     def _severity_meets_threshold(self, severity: SeverityLevel, threshold: SeverityLevel) -> bool:
