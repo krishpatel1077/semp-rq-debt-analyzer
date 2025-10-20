@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEMP Requirements Debt Analyzer | Draper</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        :root {
+            --draper-orange: #FF4611;
+            --draper-black: #10181F;
+            --draper-white: #FFFFFF;
+            --draper-orange-light: rgba(255, 70, 17, 0.1);
+            --draper-orange-hover: #E63E0E;
+            --draper-gray-light: #f8f9fa;
+            --draper-gray-border: #dee2e6;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--draper-orange);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--draper-orange-hover);
+            background-color: var(--draper-orange-light);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--draper-orange);
+            background-color: var(--draper-orange-light);
+            box-shadow: 0 0 15px rgba(255, 70, 17, 0.2);
+        }
+        
+        .analysis-results {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .debt-issue {
+            border: 1px solid var(--draper-gray-border);
+            border-radius: 5px;
+            margin-bottom: 15px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--draper-orange);
+        }
+        
+        .debt-issue:hover {
+            box-shadow: 0 4px 12px rgba(255, 70, 17, 0.15);
+            border-left-color: var(--draper-orange-hover);
+        }
+        
+        .severity-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .location-link {
+            color: var(--draper-orange);
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: 500;
+        }
+        
+        .location-link:hover {
+            color: var(--draper-orange-hover);
+        }
+        
+        .chat-container {
+            height: 500px;
+            border: 1px solid var(--draper-gray-border);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: var(--draper-gray-light);
+        }
+        
+        .chat-input-area {
+            padding: 15px;
+            border-top: 1px solid var(--draper-gray-border);
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        
+        .message.user {
+            background-color: var(--draper-orange);
+            color: white;
+            margin-left: auto;
+        }
+        
+        .message.assistant {
+            background-color: white;
+            border: 1px solid var(--draper-gray-border);
+        }
+        
+        .text-viewer {
+            background-color: var(--draper-gray-light);
+            border: 1px solid var(--draper-gray-border);
+            border-radius: 5px;
+            padding: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .highlighted-text {
+            background-color: var(--draper-orange-light);
+            border: 1px solid var(--draper-orange);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .status-ready {
+            background-color: var(--draper-orange);
+        }
+        
+        .status-processing {
+            background-color: var(--draper-orange-hover);
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+        
+        .status-error {
+            background-color: var(--draper-black);
+        }
+        
+        @keyframes pulse {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
+        
+        /* Draper-themed buttons */
+        .btn-primary {
+            background-color: var(--draper-orange);
+            border-color: var(--draper-orange);
+        }
+        
+        .btn-primary:hover, .btn-primary:focus {
+            background-color: var(--draper-orange-hover);
+            border-color: var(--draper-orange-hover);
+        }
+        
+        .btn-outline-primary {
+            color: var(--draper-orange);
+            border-color: var(--draper-orange);
+        }
+        
+        .btn-outline-primary:hover, .btn-outline-primary:focus {
+            background-color: var(--draper-orange);
+            border-color: var(--draper-orange);
+        }
+        
+        .btn-outline-secondary {
+            color: var(--draper-black);
+            border-color: var(--draper-black);
+        }
+        
+        .btn-outline-secondary:hover, .btn-outline-secondary:focus {
+            background-color: var(--draper-black);
+            border-color: var(--draper-black);
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Header -->
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h1 class="card-title mb-0" style="color: var(--draper-black);">
+                            <i class="fas fa-search" style="color: var(--draper-orange);"></i>
+                            SEMP Requirements Debt Analyzer
+                        </h1>
+                        <p class="card-text" style="color: var(--draper-black); opacity: 0.8;">Upload and analyze SEMP documents for requirements debt issues</p>
+                        <div class="d-flex align-items-center">
+                            <span class="status-indicator status-ready"></span>
+                            <small class="text-muted">Ready for analysis</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Upload Section -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0" style="color: var(--draper-black);">
+                            <i class="fas fa-upload" style="color: var(--draper-orange);"></i>
+                            Document Upload
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h5>Drop your SEMP document here</h5>
+                            <p class="text-muted">or click to select a file</p>
+                            <small class="text-muted">Supports PDF, DOCX, TXT, and Markdown files (max 50MB)</small>
+                        </div>
+                        <input type="file" id="fileInput" class="d-none" accept=".pdf,.docx,.txt,.md">
+                        
+                        <!-- File Info -->
+                        <div id="fileInfo" class="mt-3" style="display: none;">
+                            <div class="alert alert-info">
+                                <strong>Selected:</strong> <span id="fileName"></span>
+                                <br><strong>Size:</strong> <span id="fileSize"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Analysis Settings -->
+                        <div id="analysisSettings" class="mt-3" style="display: none;">
+                            <hr>
+                            <h6>Analysis Settings</h6>
+                            <div class="mb-3">
+                                <label for="severityThreshold" class="form-label">Severity Threshold</label>
+                                <select class="form-select" id="severityThreshold">
+                                    <option value="Low">Low (all issues)</option>
+                                    <option value="Medium" selected>Medium and above</option>
+                                    <option value="High">High and above</option>
+                                    <option value="Critical">Critical only</option>
+                                </select>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="includeSuggestions" checked>
+                                <label class="form-check-label" for="includeSuggestions">
+                                    Include improvement suggestions
+                                </label>
+                            </div>
+                            <button class="btn btn-primary mt-3" id="analyzeBtn">
+                                <span class="loading spinner-border spinner-border-sm me-2"></span>
+                                <i class="fas fa-search me-1"></i>
+                                Analyze Document
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chat Section -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0" style="color: var(--draper-black);">
+                            <i class="fas fa-comments" style="color: var(--draper-orange);"></i>
+                            AI Assistant
+                        </h5>
+                        <small style="color: var(--draper-black); opacity: 0.7;">Ask questions about the analysis results</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="chat-container">
+                            <div class="chat-messages" id="chatMessages">
+                                <div class="message assistant">
+                                    <strong>AI Assistant:</strong>
+                                    <p class="mb-0">Hello! I'm ready to help you understand the requirements debt analysis results. Upload a document and run the analysis, then ask me about specific issues or general questions about requirements debt.</p>
+                                </div>
+                            </div>
+                            <div class="chat-input-area">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="chatInput" placeholder="Ask about requirements debt issues...">
+                                    <button class="btn btn-primary" id="sendChatBtn">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analysis Results Section -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0" style="color: var(--draper-black);">
+                            <i class="fas fa-list-ul" style="color: var(--draper-orange);"></i>
+                            Analysis Results
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" id="exportBtn" disabled>
+                                <i class="fas fa-download"></i>
+                                Export Results
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="analysisResults" class="analysis-results">
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                                <p>Upload and analyze a document to see results here</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Text Viewer Modal -->
+    <div class="modal fade" id="textViewerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Document Text</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="textViewerContent" class="text-viewer"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Main Application JavaScript -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

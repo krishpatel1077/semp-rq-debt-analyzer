@@ -248,6 +248,13 @@ The analysis will include specific locations, problem descriptions, recommended 
     def _handle_question(self, session_id: str, message: str, chat_history: List[Dict]) -> str:
         """Handle general questions about requirements engineering"""
         try:
+            # First check if we have analysis context for this session
+            analysis_info = self.db_client.get_agent_info(f"session_analysis_{session_id}")
+            
+            # If we have analysis context and the question seems related to specific issues
+            if analysis_info and self._is_analysis_specific_question(message):
+                return self._handle_analysis_specific_question(message, analysis_info, session_id)
+            
             # Search knowledge base for relevant information
             search_results = self.knowledge_base.search_knowledge_base(
                 message, top_k=5, score_threshold=0.3
@@ -279,6 +286,256 @@ Would you like me to elaborate on any specific aspect or analyze a SEMP document
             logger.error(f"Failed to handle question: {e}")
             return "I encountered an error processing your question. Please try rephrasing it or ask about a specific SEMP analysis topic."
     
+    def _is_analysis_specific_question(self, message: str) -> bool:
+        """Check if the question is about specific analysis results"""
+        analysis_indicators = [
+            'this issue', 'this problem', 'this debt', 'this requirement',
+            'vague terminology', 'ambiguity', 'incompleteness', 'inconsistency',
+            'traceability gap', 'unclear acceptance', 'untestable', 'conflicting',
+            'reliability', 'measurable terms', 'verify compliance', 'problematic',
+            'should it be addressed', 'how should', 'what makes this',
+            'why is this', 'how to fix', 'recommended fix',
+            'ambiguity issue', 'requirements management process', 'change control',
+            'lack of a clear', 'lack of a defined', 'does not describe',
+            'explain more about', 'tell me about', 'what is problematic'
+        ]
+        
+        # Also check for quoted text (indicates reference to specific issue)
+        has_quotes = '"' in message and message.count('"') >= 2
+        
+        return any(indicator in message.lower() for indicator in analysis_indicators) or has_quotes
+    
+    def _handle_analysis_specific_question(self, message: str, analysis_info: Dict, session_id: str) -> str:
+        """Handle questions about specific analysis issues"""
+        try:
+            analysis_data = analysis_info.get("last_analysis", {})
+            issues = analysis_data.get("issues", [])
+            
+            if not issues:
+                return "I don't have any specific issues to reference from the recent analysis."
+            
+            # Try to find the specific issue being asked about
+            relevant_issues = []
+            message_lower = message.lower()
+            
+            # Extract quoted text if present
+            quoted_text = ""
+            if '"' in message:
+                import re
+                quotes = re.findall(r'"([^"]+)"', message)
+                if quotes:
+                    quoted_text = quotes[0].lower()
+            
+            for issue in issues:
+                issue_type = issue.get('debt_type', '').lower()
+                problem_desc = issue.get('problem_description', '').lower()
+                location = issue.get('location_in_text', '').lower()
+                
+                # Calculate relevance score
+                relevance_score = 0
+                
+                # High relevance: exact issue type match
+                if issue_type in message_lower:
+                    relevance_score += 10
+                
+                # Medium relevance: quoted text matches problem description
+                if quoted_text and quoted_text in problem_desc:
+                    relevance_score += 8
+                    
+                # Medium relevance: key words from issue type
+                for word in issue_type.split():
+                    if len(word) > 3 and word in message_lower:
+                        relevance_score += 3
+                
+                # Low relevance: key words from problem description  
+                for word in problem_desc.split()[:10]:  # First 10 words are most important
+                    if len(word) > 4 and word in message_lower:
+                        relevance_score += 1
+                
+                # Add issue if it has any relevance
+                if relevance_score > 0:
+                    issue['_relevance_score'] = relevance_score
+                    relevant_issues.append(issue)
+            
+            # Sort by relevance score
+            relevant_issues.sort(key=lambda x: x.get('_relevance_score', 0), reverse=True)
+            
+            if relevant_issues:
+                # Focus on the most relevant issue
+                issue = relevant_issues[0]
+                return self._explain_specific_issue(issue, message)
+            else:
+                # If no specific issue found, provide general guidance
+                return self._provide_general_analysis_guidance(message, analysis_data)
+                
+        except Exception as e:
+            logger.error(f"Failed to handle analysis-specific question: {e}")
+            return "I encountered an error analyzing your question about the specific issue. Please try rephrasing your question."
+    
+    def _explain_specific_issue(self, issue: Dict, original_question: str) -> str:
+        """Provide detailed AI-powered explanation of a specific issue"""
+        try:
+            issue_type = issue.get('debt_type', 'Unknown')
+            problem = issue.get('problem_description', '')
+            location = issue.get('location_in_text', '')
+            fix = issue.get('recommended_fix', '')
+            severity = issue.get('severity', '')
+            confidence = issue.get('confidence', 0)
+            reference = issue.get('reference', '')
+            
+            # Create a contextual prompt for the AI
+            system_prompt = """You are an expert Requirements Engineering consultant. Provide clear, educational explanations about requirements debt issues. Be conversational, helpful, and focus on practical guidance that helps the user understand both the problem and the solution."""
+            
+            user_prompt = f"""I found this {issue_type} issue in a SEMP document analysis:
+
+Problem: {problem}
+
+Location: {location}
+
+Recommended Fix: {fix}
+
+Severity: {severity} | Confidence: {confidence*100:.0f}%
+
+The user asked: "{original_question}"
+
+Please provide a comprehensive, conversational explanation that addresses:
+1. What makes this specific issue problematic in systems engineering
+2. Why this type of requirements debt matters
+3. How to implement the recommended fix practically
+4. What could happen if this isn't addressed
+5. Any additional insights or best practices
+
+Be specific to this exact issue, not generic. Make it educational and actionable."""
+            
+            # Generate AI response using Bedrock
+            from src.infrastructure.bedrock_client import BedrockClient
+            bedrock_client = BedrockClient()
+            
+            ai_response = bedrock_client.generate_text(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_tokens=1200,
+                temperature=0.3
+            )
+            
+            # Add reference information
+            response = f"{ai_response}\n\n---\n**Supporting References:** {reference}\n**Document Location:** {location}"
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to generate AI explanation: {e}")
+            # Fallback to basic explanation
+            issue_type = issue.get('debt_type', 'Unknown')
+            problem = issue.get('problem_description', '')
+            fix = issue.get('recommended_fix', '')
+            
+            return f"""## {issue_type} Issue
+
+**The Problem:** {problem}
+
+**Recommended Fix:** {fix}
+
+I encountered an error generating a detailed explanation. Please try asking your question again, or ask about a different aspect of this issue."""
+    
+    def _provide_general_analysis_guidance(self, message: str, analysis_data: Dict) -> str:
+        """Provide AI-powered general guidance when no specific issue is identified"""
+        try:
+            total_issues = analysis_data.get('total_issues', 0)
+            severity_dist = analysis_data.get('severity_distribution', {})
+            debt_types = analysis_data.get('debt_type_distribution', {})
+            
+            # Create summary of the analysis for AI context
+            analysis_summary = f"""Analysis found {total_issues} total issues with this distribution:
+Severity: {', '.join([f'{k}: {v}' for k, v in severity_dist.items() if v > 0])}
+Debt Types: {', '.join([f'{k}: {v}' for k, v in debt_types.items() if v > 0])}"""
+            
+            system_prompt = """You are an expert Requirements Engineering consultant. Provide actionable guidance about requirements debt analysis results. Be conversational, helpful, and focus on practical next steps."""
+            
+            user_prompt = f"""I just completed a SEMP requirements debt analysis:
+
+{analysis_summary}
+
+The user asked: "{message}"
+
+Please provide helpful guidance that:
+1. Interprets what these results mean
+2. Suggests practical next steps prioritized by impact
+3. Explains why certain types of issues matter more
+4. Offers specific advice for improving the SEMP document
+5. Answers the user's question in this context
+
+Be specific to these results, not generic. Make it actionable and educational."""
+            
+            # Generate AI response using Bedrock
+            from src.infrastructure.bedrock_client import BedrockClient
+            bedrock_client = BedrockClient()
+            
+            response = bedrock_client.generate_text(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_tokens=800,
+                temperature=0.3
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to generate analysis guidance: {e}")
+            # Simple fallback
+            total_issues = analysis_data.get('total_issues', 0)
+            return f"Based on your analysis that found {total_issues} issues, I'd recommend focusing on the highest severity items first. Would you like me to explain a specific issue or concept in more detail?"
+    
+    def _provide_general_answer(self, message: str) -> str:
+        """Provide general answers for common requirements engineering questions"""
+        message_lower = message.lower()
+        
+        if 'requirements debt' in message_lower:
+            return """Requirements debt refers to the accumulation of shortcuts, compromises, or deficiencies in requirements engineering that create future costs and risks. Common types include:
+
+• **Technical Debt**: Poor requirements documentation or processes
+• **Ambiguity Debt**: Vague or unclear requirements language
+• **Completeness Debt**: Missing or incomplete requirements
+• **Consistency Debt**: Conflicting or contradictory requirements
+• **Traceability Debt**: Poor links between requirements and other artifacts
+
+Addressing requirements debt early reduces project risk and long-term costs."""
+        
+        elif 'vague terminology' in message_lower or 'ambiguity' in message_lower:
+            return """Vague terminology in requirements is problematic because:
+
+• **Subjectivity**: Terms like "reliable," "fast," or "user-friendly" mean different things to different people
+• **Untestable**: You can't verify requirements that aren't measurably defined
+• **Implementation Risk**: Developers must make assumptions, leading to mismatched expectations
+• **Compliance Issues**: Auditors cannot objectively assess compliance
+
+**Solutions:**
+• Replace subjective terms with quantitative metrics
+• Define acceptance criteria with measurable thresholds
+• Use standard terminology and units
+• Include examples and boundary conditions"""
+        
+        elif 'semp' in message_lower or 'systems engineering' in message_lower:
+            return """A Systems Engineering Management Plan (SEMP) defines how systems engineering activities will be conducted throughout a project lifecycle. Key components include:
+
+• **Technical processes**: Requirements analysis, design, verification, validation
+• **Management processes**: Planning, risk management, configuration control
+• **Organizational structure**: Roles, responsibilities, and reporting relationships
+• **Tools and methodologies**: Standards, procedures, and supporting tools
+• **Lifecycle management**: Phase gates, reviews, and decision points
+
+A well-written SEMP provides clear, measurable guidance for all stakeholders."""
+        
+        else:
+            return """I specialize in requirements engineering and SEMP analysis. I can help with:
+
+• **Requirements Debt Analysis**: Identifying and fixing quality issues
+• **SEMP Document Review**: Analyzing management plans for completeness
+• **Best Practices**: Guidance on systems engineering standards
+• **Problem Resolution**: Specific advice on requirements challenges
+
+What specific aspect of requirements engineering would you like to explore?"""
+    
     def _handle_results_query(self, session_id: str, message: str, chat_history: List[Dict]) -> str:
         """Handle queries about analysis results"""
         try:
@@ -287,6 +544,10 @@ Would you like me to elaborate on any specific aspect or analyze a SEMP document
             
             if not analysis_info or "last_analysis" not in analysis_info:
                 return "I don't have any recent analysis results to show. Please analyze a SEMP document first by providing the document content."
+            
+            # Check if this is a specific issue question rather than general results request
+            if self._is_analysis_specific_question(message):
+                return self._handle_analysis_specific_question(message, analysis_info, session_id)
             
             # Parse the stored analysis
             analysis_data = analysis_info["last_analysis"]

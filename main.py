@@ -81,11 +81,13 @@ def analyze(document_file, output, output_format, severity, no_suggestions):
         
         # Initialize components
         kb = SEMPKnowledgeBase()
-        analyzer = RequirementsDebtAnalyzer(kb)
         
         # Extract text from the document using the document processor
         from src.rag.document_processor import DocumentProcessor
         processor = DocumentProcessor()
+        
+        # Initialize analyzer with document processor
+        analyzer = RequirementsDebtAnalyzer(kb, processor)
         text_content = processor.extract_text(binary_content, document_file.name)
         
         if not text_content:

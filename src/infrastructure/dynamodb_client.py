@@ -4,7 +4,8 @@ DynamoDB client for chat history and agent information management
 import boto3
 import json
 from datetime import datetime, timezone
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+from decimal import Decimal
 from botocore.exceptions import ClientError, NoCredentialsError
 from loguru import logger
 from config.settings import get_aws_config, settings
@@ -12,6 +13,20 @@ from config.settings import get_aws_config, settings
 
 class DynamoDBChatClient:
     """Client for managing chat history and agent information in DynamoDB"""
+    
+    @staticmethod
+    def convert_floats_to_decimal(obj: Any) -> Any:
+        """Convert float values to Decimal and datetime to ISO string for DynamoDB compatibility"""
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {k: DynamoDBChatClient.convert_floats_to_decimal(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [DynamoDBChatClient.convert_floats_to_decimal(item) for item in obj]
+        else:
+            return obj
     
     def __init__(self):
         try:
@@ -53,11 +68,14 @@ class DynamoDBChatClient:
         try:
             timestamp = datetime.now(timezone.utc).isoformat()
             
+            # Convert floats to Decimal for DynamoDB compatibility
+            converted_metadata = self.convert_floats_to_decimal(metadata or {})
+            
             message = {
                 'role': role,  # 'user', 'assistant', 'system'
                 'content': content,
                 'timestamp': timestamp,
-                'metadata': metadata or {}
+                'metadata': converted_metadata
             }
             
             # Add message to the session
@@ -178,10 +196,13 @@ class DynamoDBChatClient:
         try:
             timestamp = datetime.now(timezone.utc).isoformat()
             
+            # Convert floats to Decimal for DynamoDB compatibility
+            converted_data = self.convert_floats_to_decimal(agent_data)
+            
             item = {
                 'agent_id': agent_id,
                 'updated_at': timestamp,
-                **agent_data
+                **converted_data
             }
             
             self.agent_table.put_item(Item=item)

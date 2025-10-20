@@ -15,16 +15,21 @@ from src.models.debt_models import (
     AnalysisRequest
 )
 from src.rag.knowledge_base import SEMPKnowledgeBase
+from src.rag.document_processor import DocumentProcessor
 
 
 class RequirementsDebtAnalyzer:
     """Expert assistant for detecting Requirements Debt in SEMPs"""
     
-    def __init__(self, knowledge_base: SEMPKnowledgeBase):
+    def __init__(self, knowledge_base: SEMPKnowledgeBase, document_processor: DocumentProcessor = None):
         self.knowledge_base = knowledge_base
+        self.document_processor = document_processor or DocumentProcessor()
         
         # Initialize Bedrock client
         self.bedrock_client = BedrockClient()
+        
+        # Store original document text for coordinate lookups
+        self.original_text = None
         
         logger.info("Requirements Debt Analyzer initialized")
     
@@ -35,6 +40,9 @@ class RequirementsDebtAnalyzer:
         logger.info(f"Starting analysis of document: {request.document_name}")
         
         try:
+            # Store original document text for coordinate lookups
+            self.original_text = request.document_content
+            
             # Initialize result
             result = AnalysisResult(
                 document_name=request.document_name,
@@ -197,12 +205,13 @@ class RequirementsDebtAnalyzer:
                 # Parse debt type (handle multiple types)
                 debt_type = self._parse_debt_type(issue_data.get('type', 'Ambiguity'))
                 
-                # Enhanced location information with text snippet
-                location_info = self._create_enhanced_location(
+                # Enhanced location information with text snippet and coordinates
+                location_info = self._create_enhanced_location_with_coordinates(
                     issue_data.get('location', section_name), 
                     content, 
                     section_name,
-                    issue_data.get('context', '')
+                    issue_data.get('context', ''),
+                    self.original_text
                 )
                 
                 # Create the debt issue
@@ -390,6 +399,57 @@ Focus on actionable findings that would help improve the SEMP's quality and redu
         except Exception as e:
             logger.warning(f"Failed to create enhanced location: {e}")
             return section_name
+    
+    def _create_enhanced_location_with_coordinates(self, raw_location: str, content: str, section_name: str, context: str, full_text: str) -> str:
+        """Create enhanced location information with precise coordinates for GUI highlighting"""
+        try:
+            # Start with the basic enhanced location
+            basic_location = self._create_enhanced_location(raw_location, content, section_name, context)
+            
+            # Try to find precise coordinates in the full document
+            search_text = None
+            
+            # Use context as primary search text if available
+            if context and len(context.strip()) > 15:
+                search_text = context.strip()[:100]  # Use first 100 chars of context
+            
+            # Fall back to raw location if it looks like quoted text
+            elif raw_location and raw_location != section_name and len(raw_location) > 15:
+                search_text = raw_location.strip()[:100]
+            
+            # Find coordinates if we have search text
+            coordinates = None
+            if search_text and full_text:
+                coord_results = self.document_processor.find_text_coordinates(
+                    full_text, search_text, context_chars=100
+                )
+                if coord_results:
+                    # Use the first match
+                    coordinates = coord_results[0]
+            
+            # Return location with coordinate metadata if found
+            if coordinates:
+                # Store coordinates in a format that can be parsed by the GUI
+                coord_info = {
+                    'char_start': coordinates['char_start'],
+                    'char_end': coordinates['char_end'],
+                    'start_line': coordinates.get('start_line'),
+                    'start_page': coordinates.get('start_page'),
+                    'context': coordinates.get('context', '')
+                }
+                
+                # Embed coordinate info in the location string using a special format
+                # Format: "basic_location [COORDS:{json}]"
+                import json
+                coord_json = json.dumps(coord_info, separators=(',', ':'))
+                return f"{basic_location} [COORDS:{coord_json}]"
+            else:
+                return basic_location
+                
+        except Exception as e:
+            logger.warning(f"Failed to create enhanced location with coordinates: {e}")
+            # Fall back to basic location
+            return self._create_enhanced_location(raw_location, content, section_name, context)
     
     def _parse_debt_type(self, debt_type_str: str) -> DebtType:
         """Parse debt type from AI model response, handling multiple types"""

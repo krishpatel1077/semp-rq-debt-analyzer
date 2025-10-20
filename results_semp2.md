@@ -1,0 +1,15 @@
+# SEMP Requirements Debt Analysis Results
+
+**Document:** redacted-SEMP2.pdf
+**Analysis Date:** 2025-10-08 15:15:04.938814
+**Total Issues:** 4
+**Analysis Duration:** 19.23 seconds
+
+## Issues Found
+
+| Location | Debt Type / Problem | Recommended Fix | Reference | Severity |
+|----------|-------------------|-----------------|-----------|----------|
+| Main Content: "The document lists functional, performance, and non-functional requirements alon..." | Ambiguity: The lack of a defined requirements management process leads to ambiguity and uncertainty around how requirements will be tracked, updated, and verified throughout the project. | Incorporate a dedicated section on requirements management, including processes for change control, traceability, and version control. Specify tools and methodologies for maintaining requirement linkages and ensuring consistency across the project lifecycle. | Requirements Debt Detection Guide (score: 0.59); NASA Systems Engineering Handbook (score: 0.49); NASA Systems Engineering Handbook (score: 0.46) | High |
+| Main Content: "The document fails to address the verification and validation (V&V) process for ..." | Untestable Requirements: Without a defined V&V process, there is a risk of requirements that cannot be adequately tested or validated, leading to costly rework and requirements debt. | Incorporate a section on the verification and validation plan, outlining the specific methods (e.g., testing, inspection, analysis) that will be used to ensure each requirement is measurable and achievable. | Requirements Debt Detection Guide (score: 0.59); NASA Systems Engineering Handbook (score: 0.49); NASA Systems Engineering Handbook (score: 0.46) | Medium |
+| Main Content: "The document does not specify how requirement traceability will be ensured." | Traceability Gap: Without a defined traceability process, it becomes difficult to track requirement changes, verify implementation, and assess the impact of modifications, increasing the risk of inconsistencies and gaps. | Incorporate a section on requirements traceability, outlining the use of a requirements management tool, traceability matrices, or other mechanisms to maintain linkages between requirements, design, and verification artifacts. | Requirements Debt Detection Guide (score: 0.59); NASA Systems Engineering Handbook (score: 0.49); NASA Systems Engineering Handbook (score: 0.46) | High |
+| Main Content: "The document fails to address how requirements debt will be identified, managed,..." | Missing Constraints: The absence of a systematic approach to monitoring and mitigating requirements debt increases the risk of debt accumulation going unnoticed until later, more costly phases of the project. | Incorporate a section on requirements debt management, including processes for regularly auditing requirements, identifying debt indicators, and implementing mitigation strategies. Establish requirements debt metrics and integrate them into the project's health assessments. | Requirements Debt Detection Guide (score: 0.59); NASA Systems Engineering Handbook (score: 0.49); NASA Systems Engineering Handbook (score: 0.46) | High |
