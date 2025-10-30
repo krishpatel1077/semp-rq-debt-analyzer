@@ -434,7 +434,9 @@ class SEMPAnalyzer {
         if (sender === 'user') {
             messageDiv.innerHTML = `<strong>You:</strong><p class="mb-0">${this.escapeHtml(message)}</p>`;
         } else {
-            messageDiv.innerHTML = `<strong>AI Assistant:</strong><p class="mb-0">${this.escapeHtml(message)}</p>`;
+            // Render markdown for assistant messages
+            const renderedMarkdown = marked.parse(message);
+            messageDiv.innerHTML = `<strong>AI Assistant:</strong><div class="markdown-content">${renderedMarkdown}</div>`;
         }
         
         chatMessages.appendChild(messageDiv);
