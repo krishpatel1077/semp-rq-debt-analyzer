@@ -221,7 +221,7 @@ def chat_endpoint():
             if not chat_session_id:
                 return jsonify({'error': 'Failed to create chat session'}), 500
         
-        # Store analysis context in DynamoDB for session manager access
+        # Store analysis context in DynamoDB for session manager access (but don't inject it into message)
         if analysis_id and analysis_id in session:
             analysis_result = session[analysis_id]
             # Store the analysis in DynamoDB so session manager can access it
@@ -233,55 +233,10 @@ def chat_endpoint():
                     "analysis_timestamp": analysis_result.get('analysis_timestamp', '')
                 }
             )
-            
-            # Create detailed context message with specific issue information
-            issues = analysis_result.get('issues', [])
-            if issues:
-                # Find if the message relates to a specific issue
-                context_details = []
-                for issue in issues:
-                    issue_description = issue.get('problem_description', '')
-                    issue_type = issue.get('debt_type', '')
-                    if (any(word in message.lower() for word in issue_description.lower().split()[:3]) or 
-                        issue_type.lower() in message.lower()):
-                        context_details.append({
-                            'type': issue_type,
-                            'problem': issue_description,
-                            'location': issue.get('location_in_text', ''),
-                            'fix': issue.get('recommended_fix', ''),
-                            'severity': issue.get('severity', ''),
-                            'confidence': issue.get('confidence', 0)
-                        })
-                
-                if context_details:
-                    # Format specific issue context
-                    issue_context = "\n".join([
-                        f"Issue: {detail['type']} (Severity: {detail['severity']})\n"
-                        f"Problem: {detail['problem']}\n"
-                        f"Location: {detail['location']}\n"
-                        f"Recommended Fix: {detail['fix']}\n"
-                        for detail in context_details[:2]  # Limit to 2 most relevant
-                    ])
-                    
-                    context_message = f"""Based on the analysis results for {analysis_result.get('document_name', 'the document')} that found {analysis_result.get('total_issues', 0)} total issues, here are the relevant findings:
-
-{issue_context}
-
-User Question: {message}
-
-Please provide a detailed explanation addressing the user's question about this specific issue."""
-                else:
-                    # General analysis context
-                    context_message = f"""Based on the analysis results for {analysis_result.get('document_name', 'the document')} that found {analysis_result.get('total_issues', 0)} issues with the following distribution:
-{'; '.join([f"{k}: {v}" for k, v in analysis_result.get('severity_distribution', {}).items() if v > 0])}
-
-User Question: {message}
-
-Please answer the user's question in the context of this analysis."""
-            else:
-                context_message = message
-        else:
-            context_message = message
+        
+        # Let the session manager handle context intelligently
+        # Don't inject analysis context here - it will be added by session_manager if needed
+        context_message = message
         
         # Process the message
         response = session_manager.process_user_message(chat_session_id, context_message)
