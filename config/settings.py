@@ -40,9 +40,10 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=200, env="CHUNK_OVERLAP")
     environment: str = Field(default="dev", env="ENVIRONMENT")
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+    }
 
 
 # Global settings instance
