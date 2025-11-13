@@ -389,15 +389,21 @@ class SEMPAnalyzer {
     
     async sendChatMessage() {
         const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
         const message = chatInput.value.trim();
         
         if (!message) return;
         
-        // Clear input
+        // Clear input and disable button
         chatInput.value = '';
+        chatInput.disabled = true;
+        sendChatBtn.disabled = true;
         
         // Add user message to chat
         this.addChatMessage(message, 'user');
+        
+        // Add thinking indicator
+        const thinkingId = this.addThinkingIndicator();
         
         try {
             const response = await fetch('/chat', {
@@ -414,6 +420,9 @@ class SEMPAnalyzer {
             
             const result = await response.json();
             
+            // Remove thinking indicator
+            this.removeThinkingIndicator(thinkingId);
+            
             if (result.success) {
                 this.chatSessionId = result.chat_session_id;
                 this.addChatMessage(result.response, 'assistant');
@@ -422,7 +431,40 @@ class SEMPAnalyzer {
             }
         } catch (error) {
             console.error('Chat error:', error);
+            this.removeThinkingIndicator(thinkingId);
             this.addChatMessage('Sorry, I encountered an error connecting to the AI service.', 'assistant');
+        } finally {
+            // Re-enable input
+            chatInput.disabled = false;
+            sendChatBtn.disabled = false;
+            chatInput.focus();
+        }
+    }
+    
+    addThinkingIndicator() {
+        const chatMessages = document.getElementById('chatMessages');
+        const thinkingDiv = document.createElement('div');
+        const thinkingId = 'thinking-' + Date.now();
+        thinkingDiv.id = thinkingId;
+        thinkingDiv.className = 'message assistant';
+        thinkingDiv.innerHTML = `
+            <strong>AI Assistant:</strong>
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2" role="status" style="color: var(--draper-orange);">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="text-muted">Thinking...</span>
+            </div>
+        `;
+        chatMessages.appendChild(thinkingDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return thinkingId;
+    }
+    
+    removeThinkingIndicator(thinkingId) {
+        const thinkingDiv = document.getElementById(thinkingId);
+        if (thinkingDiv) {
+            thinkingDiv.remove();
         }
     }
     
