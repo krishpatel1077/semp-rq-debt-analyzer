@@ -60,9 +60,22 @@ which python
 
 ### 4. Upgrade pip (within virtual environment)
 
+**IMPORTANT:** Pip 9.0.3 has limitations and MUST be upgraded.
+
 ```bash
 # Upgrade pip to a version that works with Python 3.6
 pip install --upgrade "pip>=20.0,<21.0"
+
+# Verify upgrade
+pip --version
+# Should show pip 20.x.x
+```
+
+**If pip upgrade fails**, you can use the pip 9.0.3 compatible requirements file:
+
+```bash
+# Only if pip upgrade is not possible
+pip install -r requirements-pip9.txt
 ```
 
 ### 5. Install Dependencies
@@ -70,6 +83,9 @@ pip install --upgrade "pip>=20.0,<21.0"
 ```bash
 # Install all dependencies from requirements.txt
 pip install -r requirements.txt
+
+# OR if using pip 9.0.3 (not recommended)
+# pip install -r requirements-pip9.txt
 ```
 
 **Note:** If you encounter installation issues, try installing packages individually:
@@ -322,6 +338,19 @@ tail -f /var/log/nginx/error.log
 ```
 
 ## Troubleshooting
+
+### Issue: Cannot upgrade pip from 9.0.3
+
+```bash
+# Try downloading and installing manually
+curl https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py
+python3 get-pip.py
+
+# Or use the pip 9.0.3 compatible requirements
+pip install -r requirements-pip9.txt
+```
+
+**Note:** requirements-pip9.txt unconditionally installs dataclasses, which is fine for Python 3.6.
 
 ### Issue: pip install fails with SSL errors
 
