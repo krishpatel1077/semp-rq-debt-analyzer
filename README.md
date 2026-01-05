@@ -1,137 +1,84 @@
-# SEMP Requirements Debt Analyzer
+# SEMP Requirements Technical Debt Analyzer (SRDA)
 
-A proof-of-concept tool for analyzing Requirements Debt in Systems Engineering Management Plans (SEMPs). This tool serves as a demonstration of an agent model specialized in Requirements Engineering, Systems Engineering, and the detection of Requirements Debt (RQ Debt).
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-orange.svg)](https://aws.amazon.com/bedrock/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-## Features
+> An AI-powered tool for automated detection and analysis of Requirements Debt in Systems Engineering Management Plans (SEMPs)
 
-- **Document Analysis**: Analyze SEMP documents for various types of requirements debt including ambiguity, incompleteness, inconsistency, traceability gaps, vague terminology, missing constraints, unclear acceptance criteria, conflicting requirements, outdated requirements, and untestable requirements.
+SRDA leverages Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) to automatically identify, classify, and provide remediation recommendations for requirements quality issues in systems engineering documentation. Built on AWS Bedrock with Claude 3 Sonnet, the system provides transparent chain-of-thought reasoning grounded in authoritative standards from INCOSE, NASA, and IEEE.
 
-- **Chain-of-Thought Reasoning**: Apply structured reasoning to explain debt detection findings and provide transparent analysis.
+**This project was developed as part of a Masters Thesis in Systems Engineering, completed and published in 2025. The full thesis can be found at the following link: https://digital.wpi.edu/pdfviewer/mk61rn831**
 
-- **RAG-Powered Knowledge Base**: Search curated Systems Engineering documents and standards stored in S3 for relevant information and best practices using FAISS for efficient vector similarity search.
+---
 
-- **Interactive Chat**: Maintain conversational context for iterative analysis and refinement through DynamoDB-backed chat sessions.
+## Key Features
 
-- **Structured Output**: Present findings in tabular format with specific columns: Location in Text, Debt Type/Problem, Recommended Fix, Reference, and Severity.
+- **Automated Debt Detection**: Identifies 10 types of requirements debt including ambiguity, incompleteness, inconsistency, traceability gaps, and more
+- **Chain-of-Thought Reasoning**: Provides transparent explanations for each finding with confidence scores
+- **RAG-Powered Knowledge Base**: Searches curated systems engineering standards (INCOSE, NASA, IEEE) for authoritative guidance
+- **Dual Interface**: Command-line tool for automation and web GUI for interactive analysis
+- **Structured Output**: Results in tabular format with location, problem, fix, reference, and severity
+- **Interactive Chat**: Conversational interface for iterative refinement and detailed explanations
+- **Cloud-Native Architecture**: Built on AWS Bedrock, S3, and DynamoDB for scalability
 
-- **Severity Assessment**: Classify issues by severity (Low, Medium, High, Critical) and confidence levels (0.0-1.0).
+---
 
-## Architecture
+## Quick Start
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Frontend/CLI                           │
-│                    (Rich Console)                           │
-├─────────────────────────────────────────────────────────────┤
-│                   Agent Layer                               │
-│  ┌─────────────────────┐  ┌─────────────────────────────────┤
-│  │ Requirements Debt   │  │    Session Manager              │
-│  │     Analyzer        │  │   (Chat History)               │
-│  └─────────────────────┘  └─────────────────────────────────┤
-├─────────────────────────────────────────────────────────────┤
-│                    RAG Layer                               │
-│  ┌─────────────────────┐  ┌─────────────────────────────────┤
-│  │ Knowledge Base      │  │  Document Processor             │
-│  │ (FAISS + Bedrock)   │  │  (PDF/DOCX/MD/TXT/JSON)        │
-│  └─────────────────────┘  └─────────────────────────────────┤
-├─────────────────────────────────────────────────────────────┤
-│                Infrastructure Layer                         │
-│  ┌─────────────────────┐  ┌─────────────────────────────────┤
-│  │  S3 Knowledge Base  │  │   DynamoDB Chat Storage        │
-│  │     (Documents)     │  │   (Sessions & History)         │
-│  └─────────────────────┘  └─────────────────────────────────┤
-└─────────────────────────────────────────────────────────────┘
-```
+### Prerequisites
 
-## Setup
+- Python 3.8 or higher
+- AWS account with Bedrock access (Claude 3 Sonnet model enabled)
+- AWS credentials configured
 
-### 1. Environment Setup
+### Installation
 
-Copy the environment template and configure your settings:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/semp-rq-debt-analyzer.git
+   cd semp-rq-debt-analyzer
+   ```
 
-```bash
-cp .env.template .env
-```
+2. **Set up Python environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-Edit `.env` with your AWS credentials and configuration:
+3. **Configure environment**
+   ```bash
+   cp .env.template .env
+   # Edit .env with your AWS credentials and configuration
+   ```
 
-```bash
-# AWS Configuration
-AWS_ACCESS_KEY_ID=your_access_key_here
-AWS_SECRET_ACCESS_KEY=your_secret_key_here
-AWS_REGION=us-east-1
+4. **Set up AWS infrastructure**
+   ```bash
+   # Create S3 bucket for knowledge base
+   aws s3 mb s3://your-semp-knowledge-base-bucket
+   
+   # Create DynamoDB tables
+   python -c "from src.infrastructure.dynamodb_client import DynamoDBChatClient; DynamoDBChatClient().create_tables_if_not_exist()"
+   ```
 
-# S3 Configuration for Knowledge Base
-S3_KNOWLEDGE_BASE_BUCKET=your-semp-knowledge-base-bucket
-S3_KNOWLEDGE_BASE_PREFIX=semp-docs/
+5. **Initialize knowledge base**
+   ```bash
+   # Upload your SEMP reference documents to S3, then:
+   python main.py init-knowledge-base
+   ```
 
-# DynamoDB Configuration
-DYNAMODB_CHAT_HISTORY_TABLE=semp-chat-history
-DYNAMODB_AGENT_INFO_TABLE=semp-agent-info
+For detailed setup instructions, see [INSTALLATION.md](./INSTALLATION.md).
 
-# AWS Bedrock Configuration
-BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
-BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v1
-BEDROCK_REGION=us-east-1
-```
-
-### 2. AWS Resources Setup
-
-Create the required AWS resources:
-
-**S3 Bucket:**
-```bash
-aws s3 mb s3://your-semp-knowledge-base-bucket
-```
-
-**DynamoDB Tables:**
-```bash
-# Chat history table
-aws dynamodb create-table \
-    --table-name semp-chat-history \
-    --attribute-definitions AttributeName=session_id,AttributeType=S \
-    --key-schema AttributeName=session_id,KeyType=HASH \
-    --billing-mode PAY_PER_REQUEST
-
-# Agent info table
-aws dynamodb create-table \
-    --table-name semp-agent-info \
-    --attribute-definitions AttributeName=agent_id,AttributeType=S \
-    --key-schema AttributeName=agent_id,KeyType=HASH \
-    --billing-mode PAY_PER_REQUEST
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Initialize Knowledge Base
-
-Upload your SEMP documents and reference materials to the S3 bucket, then initialize the knowledge base:
-
-```bash
-python main.py init-knowledge-base
-```
+---
 
 ## Usage
 
 ### Command Line Interface
 
-**Check system status:**
-```bash
-python main.py status
-```
-
 **Analyze a SEMP document:**
 ```bash
-python main.py analyze path/to/semp_document.txt --severity Medium --output results.md
-```
-
-**Search the knowledge base:**
-```bash
-python main.py search --query "requirements traceability" --top-k 5
+python main.py analyze path/to/semp_document.pdf --severity Medium --output results.md
 ```
 
 **Interactive chat mode:**
@@ -139,16 +86,93 @@ python main.py search --query "requirements traceability" --top-k 5
 python main.py chat
 ```
 
-### Example Analysis Output
+**Search knowledge base:**
+```bash
+python main.py search --query "requirements traceability" --top-k 5
+```
 
-The tool produces structured output in the requested tabular format:
+**Check system status:**
+```bash
+python main.py status
+```
+
+### Web Interface
+
+Launch the web GUI for a modern, interactive experience:
+
+```bash
+./start_web_gui.sh
+# Or manually:
+# source venv/bin/activate
+# python web_app.py
+```
+
+Then open your browser to `http://localhost:5000`
+
+**Web Features:**
+- Drag-and-drop document upload (PDF, DOCX, TXT, MD)
+- Real-time analysis with progress tracking
+- Clickable location links to view exact problematic text
+- AI chat assistant for detailed explanations
+- Export results as structured Markdown
+
+For more examples, see [docs/EXAMPLES.md](./docs/EXAMPLES.md).
+
+---
+
+## Architecture
+
+SRDA uses a four-tier layered architecture:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Presentation Layer                        │
+│                  (CLI + Web Interface)                       │
+├─────────────────────────────────────────────────────────────┤
+│                      Agent Layer                             │
+│  • Requirements Debt Analyzer (Chain-of-Thought)            │
+│  • Session Manager (Chat & Context)                         │
+├─────────────────────────────────────────────────────────────┤
+│                      RAG Layer                               │
+│  • Knowledge Base (FAISS Vector Search)                     │
+│  • Document Processor (Multi-format parsing)                │
+├─────────────────────────────────────────────────────────────┤
+│                  Infrastructure Layer                        │
+│  • AWS Bedrock (Claude 3 Sonnet + Titan Embeddings)        │
+│  • S3 (Knowledge Base Storage)                              │
+│  • DynamoDB (Session & Chat History)                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Analysis Pipeline:**
+1. Document decomposition into sections
+2. RAG context retrieval from knowledge base
+3. Chain-of-thought analysis via Claude 3 Sonnet
+4. Issue extraction and validation
+5. Structured output generation
+
+For detailed architecture documentation, see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+---
+
+## Example Output
 
 | Location in Text | Debt Type / Problem | Recommended Fix | Reference | Severity |
 |------------------|--------------------|-----------------|-----------|---------
-| Section 3.1.2 "The system shall be reliable" | Vague Terminology: Undefined term "reliable" without measurable criteria | Define "reliable" with specific metrics (e.g., MTBF ≥ 1000 hours, availability ≥ 99.9%) | IEEE 830-1998 Requirements Specification | High |
-| Section 4.2 Requirements table | Traceability Gap: No clear mapping to higher-level requirements | Implement traceability matrix linking each requirement to parent requirements and verification methods | INCOSE Systems Engineering Handbook | Medium |
+| Section 3.1.2 "The system shall be reliable" | **Vague Terminology**: Undefined term "reliable" without measurable criteria | Define "reliable" with specific metrics (e.g., MTBF ≥ 1000 hours, availability ≥ 99.9%) | IEEE 830-1998 Requirements Specification | High |
+| Section 4.2 Requirements table | **Traceability Gap**: No clear mapping to higher-level requirements | Implement traceability matrix linking each requirement to parent requirements and verification methods | INCOSE Systems Engineering Handbook | Medium |
 
-### Chat Interface Example
+---
 
-```
-You: Analyze this SEMP section for requirements debt
+## Documentation
+
+- **[INSTALLATION.md](./INSTALLATION.md)** - Complete setup and configuration guide
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System architecture and design patterns
+- **[docs/EXAMPLES.md](./docs/EXAMPLES.md)** - Usage examples and tutorials
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+

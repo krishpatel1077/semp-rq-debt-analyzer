@@ -1,7 +1,9 @@
-# Environment variables
+# Environment variables and credentials
 .env
+.env.*
 .env.local
 .env.production
+.env.govcloud
 
 # Python
 __pycache__/
