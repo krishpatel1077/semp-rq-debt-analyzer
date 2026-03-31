@@ -10,6 +10,8 @@ SRDA leverages Large Language Models (LLMs) and Retrieval-Augmented Generation (
 
 **This project was developed as part of a Masters Thesis in Systems Engineering, completed and published in 2025. The full thesis can be found at the following link: https://digital.wpi.edu/pdfviewer/mk61rn831**
 
+A demo video can be found at: https://www.dropbox.com/scl/fi/yjp5fuetd70rz7cgom2mp/SRDA-DEMO-VIDEO.mov?rlkey=30kvvzfy1njqr30fyuyckho02&st=w577ixs8&dl=0
+
 ---
 
 ## Key Features
