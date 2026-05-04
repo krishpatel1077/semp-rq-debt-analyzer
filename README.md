@@ -4,6 +4,8 @@
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-orange.svg)](https://aws.amazon.com/bedrock/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
+> 🚀 **SRDA is the open-source research foundation of Redline** — an offline, collaborative document review platform for regulated engineering teams in defense, aerospace, semiconductors, and automotive. Currently applying to Y Combinator S26.
+
 > An AI-powered tool for automated detection and analysis of Requirements Debt in Systems Engineering Management Plans (SEMPs)
 
 SRDA leverages Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) to automatically identify, classify, and provide remediation recommendations for requirements quality issues in systems engineering documentation. Built on AWS Bedrock with Claude 3 Sonnet, the system provides transparent chain-of-thought reasoning grounded in authoritative standards from INCOSE, NASA, and IEEE.
@@ -38,7 +40,7 @@ A demo video can be found at: https://www.dropbox.com/scl/fi/yjp5fuetd70rz7cgom2
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/semp-rq-debt-analyzer.git
+   git clone https://github.com/krishpatel1077/semp-rq-debt-analyzer.git
    cd semp-rq-debt-analyzer
    ```
 
